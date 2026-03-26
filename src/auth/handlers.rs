@@ -1,9 +1,9 @@
 use axum::{Json, extract::State, http::StatusCode};
-use bcrypt::{DEFAULT_COST, hash};
+use bcrypt::{DEFAULT_COST, hash, verify};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{auth::jwt::create_access_token, error::AppError, models::user::{User, UserResponse}, state::AppState};
+use crate::{auth::jwt::create_access_token, error::AppError, models::user::{User, UserResponse}, state::{AppState}};
 
 #[derive(Debug,Deserialize)]
 pub struct RegisterRequest {
@@ -79,3 +79,50 @@ pub async fn register(
     ))
 }
 
+
+
+//POST/auth/login
+
+#[derive(Debug,Deserialize)]
+pub struct LoginRequest {
+    pub email : String,
+    pub password : String
+}
+
+pub async fn login(
+    State(state) : State<AppState>,
+    Json(body) :Json<LoginRequest>
+) -> Result<Json<AuthResponse>,AppError> {
+
+    let user = sqlx::query_as!(
+        User,
+        r#"
+            SELECT id, email, name, password_hash, created_at, updated_at
+            FROM users
+            WHERE email = $1
+        "#,
+        body.email.to_lowercase()
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::Unauthorized)?;
+
+    let password_is_correct = verify(&body.password, &user.password_hash)
+    .map_err(|e|{
+        tracing::error!("bcrytp verify failed : {:?}",e);
+        AppError::Internal
+    })?;
+
+    if !password_is_correct {
+        return Err(AppError::Unauthorized)
+    }
+
+    let token = create_access_token(user.id, &user.email, &state.jwt_secret)
+    .map_err(|_|{AppError::Internal})?;
+
+    Ok(
+        Json(
+            AuthResponse {token ,user:user.into()}
+        )
+    )
+}
