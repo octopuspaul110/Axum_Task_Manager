@@ -2,7 +2,7 @@
 use axum::{Json, extract::{Path, State}, http::StatusCode};
 use uuid::Uuid;
 
-use crate::{auth::middleware::AuthUser, error::AppError, models::task::{CreateTaskRequest, Task, TaskStatus, TaskPriority}, state::AppState};
+use crate::{auth::middleware::AuthUser, error::AppError, models::task::{CreateTaskRequest, Task, TaskPriority, TaskStatus, UpdateTaskRequest}, state::AppState};
 
 pub async fn create_task(
     State(state) : State<AppState>,
@@ -103,6 +103,151 @@ pub async fn list_tasks(
     .await?;
 
     Ok(Json(tasks))
+}
+
+// GET / tasks/{id}
+pub async fn get_task(
+    State(state): State<AppState>,
+    user : AuthUser,
+    Path(task_id) : Path<Uuid>,
+
+) -> Result<Json<Task>,AppError> {
+
+    let task = sqlx::query_as!(
+        Task,
+        r#"
+            SELECT 
+                id,
+                project_id,
+                title,
+                description,
+                status AS "status: TaskStatus",
+                priority AS "priority: TaskPriority",
+                due_date,
+                created_at,
+                updated_at
+            FROM tasks
+            WHERE id = $1
+            AND project_id IN
+                (SELECT id FROM projects where user_id = $2)
+        "#,
+        task_id,
+        user.user_id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(||{
+        AppError::NotFound(
+            format!("Task not found : {task_id}")
+        )
+    })?;
+
+    Ok(Json(task))
+}
+
+// Put /task/{id}
+pub async fn update_task(
+    State(state) : State<AppState>,
+    user : AuthUser,
+    Path(task_id) : Path<Uuid>,
+    Json(body): Json<UpdateTaskRequest>
+)   -> Result<Json<Task>,AppError> 
+{
+    let existing_task = sqlx::query_as!(
+        Task,
+        r#"
+            SELECT 
+                id,
+                project_id,
+                title,
+                description,
+                status AS "status: TaskStatus",
+                priority AS "priority: TaskPriority",
+                due_date,
+                created_at,
+                updated_at
+            FROM tasks
+            WHERE id = $1
+            AND project_id IN (
+                SELECT id FROM projects WHERE user_id = $2
+            )
+        "#,
+        task_id,
+        user.user_id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(||{
+        AppError::NotFound(
+            format!("Task not found : {task_id}")
+        )
+    })?;
+
+    if let Some(ref title) = body.title {
+        if title.trim().is_empty() {
+            return Err(AppError::BadRequest(
+                "Task title cannot be empty".into()
+            ));
+        }
+    }
+
+    let new_title = body.title
+    .as_deref()
+    .map(str::trim)
+    .map(String::from)
+    .unwrap_or(existing_task.title);
+
+    let new_description = match body.description {
+        Some(d) => d,
+        None            => existing_task.description.unwrap(),
+    };
+
+    let new_status = body.status.unwrap_or(existing_task.status);
+    let new_priority = body.priority.unwrap_or(existing_task.priority);
+
+    let new_due_date = match body.due_date {
+        Some(d) => Some(d),
+        None                   => existing_task.due_date  
+    };
+
+    let updated_task = sqlx::query_as!(
+        Task,
+        r#"
+            UPDATE tasks
+            SET
+                title = $1,
+                description = $2,
+                status = $3,
+                priority = $4,
+                due_date = $5,
+                updated_at = NOW()
+            WHERE id = $6
+                AND project_id IN (
+                    SELECT id FROM projects WHERE user_id = $7
+                )
+            RETURNING
+                id,
+                project_id,
+                title,
+                description,
+                status      AS "status: TaskStatus",
+                priority    AS "priority: TaskPriority",
+                due_date,
+                created_at,
+                updated_at
+        "#,
+        new_title,
+        new_description,
+        new_status      as TaskStatus,
+        new_priority    as TaskPriority,
+        new_due_date,
+        task_id,
+        user.user_id
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(updated_task))
 }
 
 

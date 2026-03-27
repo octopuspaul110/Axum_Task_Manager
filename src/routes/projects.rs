@@ -149,9 +149,8 @@ pub async fn update_project(
 pub async fn delete_project(
     State(state) : State<AppState>,
     user : AuthUser,
-    project_id : Uuid
+    Path(project_id) : Path<Uuid>
 )  -> Result<StatusCode,AppError>{
-
 
     let result = sqlx::query!(
         "DELETE FROM projects WHERE id = $1 and user_id = $2",
@@ -166,6 +165,6 @@ pub async fn delete_project(
             format!("Project {} not found", project_id)
         ));
     }
-
     Ok(StatusCode::NO_CONTENT)
 }
+
