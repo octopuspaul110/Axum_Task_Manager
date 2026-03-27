@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM tasks\n            WHERE id = $1\n                AND project_id IN (\n                    SELECT id FROM projects WHERE user_id = $2\n                )\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc852ea3e35b6652d4888ad0be3ab5761efcc2c38714eb76a57c86a856dad8d2"
+}

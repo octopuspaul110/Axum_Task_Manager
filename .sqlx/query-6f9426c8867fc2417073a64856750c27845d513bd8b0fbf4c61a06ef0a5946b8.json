@@ -1,0 +1,120 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE tasks\n            SET\n                title = $1,\n                description = $2,\n                status = $3,\n                priority = $4,\n                due_date = $5,\n                updated_at = NOW()\n            WHERE id = $6\n                AND project_id IN (\n                    SELECT id FROM projects WHERE user_id = $7\n                )\n            RETURNING\n                id,\n                project_id,\n                title,\n                description,\n                status      AS \"status: TaskStatus\",\n                priority    AS \"priority: TaskPriority\",\n                due_date,\n                created_at,\n                updated_at\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "project_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "status: TaskStatus",
+        "type_info": {
+          "Custom": {
+            "name": "task_status",
+            "kind": {
+              "Enum": [
+                "todo",
+                "in_progress",
+                "done"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "priority: TaskPriority",
+        "type_info": {
+          "Custom": {
+            "name": "task_priority",
+            "kind": {
+              "Enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "due_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "task_status",
+            "kind": {
+              "Enum": [
+                "todo",
+                "in_progress",
+                "done"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "task_priority",
+            "kind": {
+              "Enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "6f9426c8867fc2417073a64856750c27845d513bd8b0fbf4c61a06ef0a5946b8"
+}

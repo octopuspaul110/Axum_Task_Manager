@@ -106,9 +106,7 @@ async fn main() {
     .with_graceful_shutdown(shutdown_signal())
     .await
     .expect("Server encountered a fatal error");
-    
-
-
+    tracing::info!("Graceful shutdown of server.");
 }
 
 async fn shutdown_signal() {
